@@ -1,4 +1,4 @@
-theory LL
+theory PropForum
 imports Main "~~/src/HOL/Library/FSet" "~~/src/HOL/Library/Multiset" "~~/src/HOL/Library/Map" 
 begin
 
@@ -68,11 +68,20 @@ fun h and g where
 | "g (imp B C) = imp (h B) (g C)"
 | "g (lol B C) = lol (h B) (g C)"
 
-fun notamp where
-  "notamp (amp A B) = False"
-|"notamp _ = True"
-  
+inductive notamp where
+"notamp tru"
+|"notamp fal"
+|"notamp (fatm X)"
+|"notamp (why X)"
+|"notamp (par A B)"
+|"notamp (lol A B)"
+|"notamp (imp A B)"
 
+theorem notamp_X: "notamp X \<or> (\<exists> X1 X2 . X = amp X1 X2)"
+  apply(induct X)
+    using notamp.simps by auto
+    
+    
 theorem mset_union_mem: 
   "G = G1 + G2 \<Longrightarrow> (\<forall> x\<in>#G1. x\<in>#G) \<and> (\<forall> x\<in>#G2. x\<in>#G)" by auto
 
@@ -83,9 +92,34 @@ theorem mset_mem_split:
   "F \<in># G \<Longrightarrow> \<exists> G'. G = G' + {#F#}" using multi_member_split by fastforce
 
 theorem mset_quarter_compose:
-  "C1 + C2 = D1 + D2 \<Longrightarrow> \<exists> C11 C12 C21 C22. C1 = C11 + C12 \<and> C2 = C21 + C22 \<and> D1 = C11 + C21 \<and> D2 = C12 + C22"
-  sorry
-
+  "(C1::(form multiset)) + C2 = D1 + D2 \<Longrightarrow> \<exists> C11 C12 C21 C22. C1 = C11 + C12 \<and> C2 = C21 + C22 \<and> D1 = C11 + C21 \<and> D2 = C12 + C22"
+  proof(induct "C1+C2" arbitrary: C1 C2 D1 D2) 
+    case empty
+    thus ?case by auto
+  next
+    case (add x1 C)
+    then have "(x1 \<in># C1 \<and> x1 \<in># D1) \<or> (x1 \<in># C1 \<and> x1 \<in># D2) \<or> (x1 \<in># C2 \<and> x1 \<in># D1) \<or> (x1 \<in># C2 \<and> x1 \<in># D2)" by (metis add_mset_add_single multi_member_last union_iff)
+    then consider "(x1 \<in># C1 \<and> x1 \<in># D1)" | "(x1 \<in># C1 \<and> x1 \<in># D2)" | "(x1 \<in># C2 \<and> x1 \<in># D1)" | "(x1 \<in># C2 \<and> x1 \<in># D2)" by blast
+    thus ?case
+    proof (cases)
+      case 1
+      then have H1:"C = (C1 - {#x1#}) + C2" using add by (metis add_mset_remove_trivial mset_subset_eq_multiset_union_diff_commute mset_subset_eq_single)
+      then have H2:"(C1 - {#x1#}) + C2 = (D1 - {#x1#}) + D2" using add "1" by auto
+      then obtain C11 C12 C21 C22 where " C1 - {#x1#} = C11 + C12 \<and> C2 = C21 + C22 \<and> D1 - {#x1#} = C11 + C21 \<and> D2 = C12 + C22" using add(1)[OF H1 H2] by auto
+      then have " C1 = add_mset x1 C11 + C12 \<and> C2 = C21 + C22 \<and> D1 = add_mset x1 C11 + C21 \<and> D2 = C12 + C22" using "1" insert_DiffM by force
+      thus ?thesis by blast
+    next
+      case 2 (* similar to case 1 *)
+      thus ?thesis sorry
+    next
+      case 3 (* similar to case 1 *)
+      thus ?thesis sorry
+    next
+      case 4 (* similar to case 1 *)
+      thus ?thesis sorry
+    qed
+  qed
+    
 theorem lamp_destruct: "derv M (fseq P D (amp B C) A Y) \<Longrightarrow> (derv (M-1) (fseq P D B A Y) \<or> derv (M-1) (fseq P D C A Y))"
   apply(cases  rule: derv.cases)
                      apply auto
@@ -129,29 +163,15 @@ theorem lpar_lamp12_distrib: "derv M S \<Longrightarrow> S = (fseq P D (par (amp
 qed
 
 lemma h_par_notamp2:" notamp(h C) \<Longrightarrow> h B = amp B1 B2  \<Longrightarrow> h(par B C) = (amp (par B1 (h C)) (par B2 (h C)))"  
-  apply(induct "h C")
-         apply auto
-       apply (metis form.simps(65))
-      apply (metis notamp.simps(1))
-      apply (metis (no_types, lifting) form.simps(67))
-    apply (metis (no_types, lifting) form.simps(68))
-           apply (metis (no_types, lifting) form.simps(69))
-  by (metis form.simps(70))
-    
+    using notamp.simps by force
+
 lemma h_par_notamp1:" notamp(h B) \<Longrightarrow> h C = amp C1 C2  \<Longrightarrow> h(par B C) = (amp (par (h B) C1) (par (h B) C2))" 
-    apply(induct "h B")
-         apply auto
-       apply (metis (no_types, lifting) form.simps(65) form.simps(66))
-      apply (metis notamp.simps(1))
- apply (smt form.simps(66) form.simps(67))
-  apply (smt form.simps(66) form.simps(68))  
-                apply (smt form.simps(66) form.simps(69))
-  by (metis (mono_tags, lifting) form.simps(66) form.simps(70))
+  using notamp.simps by force
 
 lemma h_par_notamp12:" notamp(h B) \<Longrightarrow> notamp(h C)  \<Longrightarrow> h(par B C) = par (h B) (h C)" 
-  sorry
+    using notamp.simps by force
     
-theorem a: 
+theorem h_and_g_preserve_derivability: 
 "(derv N S' \<Longrightarrow>
  S' = (useq P' D' A G' Y') \<Longrightarrow>
  P' = P1|\<union>|P2 \<Longrightarrow>
@@ -184,7 +204,7 @@ theorem a:
 proof(induct arbitrary: P' P1 P2 D' D1 D2 G' G1 G2 Y' Y1 Y2 P D A G Y F rule: derv.inducts)
   case (rtru)
   case (1)
-    then have "tru \<in># G1 \<or> tru \<in># G2" by (metis LL.seq.inject(1) add.commute multi_member_this union_iff)
+    then have "tru \<in># G1 \<or> tru \<in># G2" by (metis seq.inject(1) add.commute multi_member_this union_iff)
     thus ?case
     proof
       assume H:"tru \<in># G1"
@@ -208,7 +228,7 @@ next
 next
     case (rfal _ P'' D'' A'' G'' Y'')
     case (1)
-    then have "fal \<in># G1 \<or> fal \<in># G2" by (metis LL.seq.inject(1) add.commute multi_member_this union_iff)
+    then have "fal \<in># G1 \<or> fal \<in># G2" by (metis seq.inject(1) add.commute multi_member_this union_iff)
     thus ?case
     proof
       assume H1:"fal \<in># G1"
@@ -456,7 +476,7 @@ next
     then have H8:"(\<exists> B1 B2 C1 C2. h B = amp B1 B2 \<and> h C = amp C1 C2) \<or>
                   ((\<exists> B1 B2. h B = amp B1 B2) \<and> notamp (h C)) \<or>
                   (notamp (h B) \<and> (\<exists> C1 C2. h C = amp C1 C2)) \<or>
-                  (notamp (h B) \<and> notamp (h C))" by (meson notamp.elims(3))
+                  (notamp (h B) \<and> notamp (h C))" using notamp_X by auto
     thus ?case
     proof 
       assume "(\<exists> B1 B2 C1 C2. h B = amp B1 B2 \<and> h C = amp C1 C2)"
@@ -521,6 +541,268 @@ next
   then show ?case sorry
   
 qed
+
+theorem h_inv_and_g_inv_preserve_derivability: 
+"(derv N S' \<Longrightarrow>
+ S' = (useq P D A G Y) \<Longrightarrow>
+ P' = P1|\<union>|P2 \<Longrightarrow>
+ D' = D1+D2 \<Longrightarrow>
+ G' = G1+G2 \<Longrightarrow>
+ Y' = Y1|\<union>|Y2 \<Longrightarrow>
+ P = P1|\<union>|(fimage h P2) \<Longrightarrow>
+ D = D1+(image_mset h D2) \<Longrightarrow>
+ G = G1+(image_mset g G2) \<Longrightarrow>
+ Y =  Y1|\<union>|(fimage g Y2) \<Longrightarrow>
+ \<exists> M. derv M (useq P' D' A G' Y'))"
+"(derv N S' \<Longrightarrow>
+ S' = (fseq P D F A Y) \<Longrightarrow>
+ P' = P1|\<union>|P2 \<Longrightarrow>
+ D' = D1+D2 \<Longrightarrow>
+ Y' = Y1|\<union>|Y2 \<Longrightarrow>
+ P = P1|\<union>|(fimage h P2) \<Longrightarrow>
+ D = D1+(image_mset h D2) \<Longrightarrow>
+ Y =  Y1|\<union>|(fimage g Y2) \<Longrightarrow>
+ \<exists> M. derv M (fseq P' D' F A Y'))"
+"(derv N S' \<Longrightarrow>
+ S' = (fseq P D (h F) A Y) \<Longrightarrow>
+ P' = P1|\<union>|P2 \<Longrightarrow>
+ D' = D1+D2 \<Longrightarrow>
+ Y' = Y1|\<union>|Y2 \<Longrightarrow>
+ P = P1|\<union>|(fimage h P2) \<Longrightarrow>
+ D = D1+(image_mset h D2) \<Longrightarrow>
+ Y =  Y1|\<union>|(fimage g Y2) \<Longrightarrow>
+ \<exists> M. derv M (fseq P' D' F A Y'))"
+proof(induct arbitrary: P' P1 P2 D' D1 D2 G' G1 G2 Y' Y1 Y2 P D A G Y F rule: derv.inducts)
+  case (rtru)
+  case (1)
+  show ?case sorry
+next 
+  case (rtru)
+  case (2)
+  show ?case sorry 
+next 
+  case (rtru)
+  case (3)
+  show ?case sorry 
+next
+  case (rfal _ P'' D'' A'' G'' Y'')
+  case (1)
+  show ?case sorry 
+next 
+  case (rfal)
+  case (2)
+  show ?case sorry 
+next 
+  case (rfal)
+  case (3)
+  show ?case sorry       
+next
+  case (fatm N P D A X G Y)
+  case (1)
+  then show ?case sorry
+next
+  case (fatm N P D A X G Y)
+  case (2)
+  then show ?case sorry
+next
+  case (fatm N P D A X G Y)
+  case (3)
+  then show ?case sorry      
+next
+  case (rwhy N P D A G Y F)
+  case (1)
+  then show ?case sorry
+next
+  case (rwhy N P D A G Y F)
+  case (2)
+  then show ?case sorry
+next
+  case (rwhy N P D A G Y F)
+  case (3)
+  then show ?case sorry      
+next
+  case (ramp N P D A G B Y M C)
+  case (1)
+  then show ?case sorry      
+next
+  case (ramp N P D A G B Y M C)
+  case (2)
+  then show ?case sorry      
+next
+  case (ramp N P D A G B Y M C)
+  case (3)
+  then show ?case sorry      
+next
+  case (rpar N P D A G B C Y)
+  case (1)
+  then show ?case sorry      
+next
+  case (rpar N P D A G B C Y)
+  case (2)
+  then show ?case sorry      
+next
+  case (rpar N P D A G B C Y)
+  case (3)
+  then show ?case sorry      
+next
+  case (rimp N P B D A G C Y)
+  case (1)
+  then show ?case sorry
+next
+  case (rimp N P B D A G C Y)
+  case (2)
+  then show ?case sorry
+next
+  case (rimp N P B D A G C Y)
+  case (3)
+  then show ?case sorry      
+next
+  case (rlol N P D B A G C Y)
+  case (1)
+  then show ?case sorry
+next
+  case (rlol N P D B A G C Y)
+  case (2)
+  then show ?case sorry
+next
+  case (rlol N P D B A G C Y)
+  case (3)
+  then show ?case sorry
+next
+    case (bangdecide F P'' N D'' A'' Y'')
+    case (1)
+    thus ?case sorry
+next
+  case (bangdecide F P'' N D'' A'' Y'')
+  case (2)
+  then show ?case sorry
+next
+  case (bangdecide F P'' N D'' A'' Y'')
+  case (3)
+  then show ?case sorry
+next
+  case (decide N P D F A Y)
+  case (1)
+  then show ?case sorry
+next
+  case (decide N P D F A Y)
+  case (2)
+  then show ?case sorry
+next
+  case (decide N P D F A Y)
+  case (3)
+  then show ?case sorry
+next
+  case (whydecide F Y N P D A)
+  case (1)
+  then show ?case sorry
+next
+  case (whydecide F Y N P D A)
+  case (2)
+  then show ?case sorry
+next
+  case (whydecide F Y N P D A)
+  case (3)
+  then show ?case sorry
+next
+  case (lfal N G Y)
+  case (1)
+  then show ?case sorry
+next
+  case (lfal N G Y)
+  case (2)
+  then show ?case sorry
+next
+  case (lfal N G Y)
+  case (3)
+  then show ?case sorry
+next
+  case (lfatm N G A Y)
+  case (1)
+  then show ?case sorry
+next
+  case (lfatm N G A Y)
+  case (2)
+  then show ?case sorry
+next
+  case (lfatm N G A Y)
+  case (3)
+  then show ?case sorry
+next
+  case (lwhy N G F Y)
+  case (1)
+  then show ?case sorry
+next
+  case (lwhy N G F Y)
+  case (2)
+  then show ?case sorry
+next
+  case (lwhy N G F Y)
+  case (3)
+  then show ?case sorry
+next
+  case (lamp1 N G D B A Y C)
+  case (1)
+  then show ?case sorry
+next
+  case (lamp1 N G D B A Y C)
+  case (2)
+  then show ?case sorry
+next
+  case (lamp1 N G D B A Y C)
+  case (3)
+  then show ?case sorry      
+next
+  case (lamp2 N G D C A Y B)
+  case (1)
+  then show ?case sorry
+next
+  case (lamp2 N G D C A Y B)
+  case (2)
+  then show ?case sorry
+next
+  case (lamp2 N G D C A Y B)
+  case (3)
+  then show ?case sorry      
+next
+  case (lpar N1 P'' D1'' B A1 Y'' N2 D2'' C A2)
+  case (1)
+  then have False using "1.prems"(1) by auto
+  thus ?case by auto
+next
+  case (lpar N1 P'' D1'' B A1 Y'' N2 D2'' C A2)
+  case (2)
+  thus ?case sorry
+next
+  case (lpar N1 P'' D1'' B A1 Y'' N2 D2'' C A2)
+  case (3)
+  thus ?case sorry      
+next
+  case (limp N G B Y M D C A)
+  case (1)
+  then show ?case sorry
+next
+  case (limp N G B Y M D C A)
+  case (2)
+  then show ?case sorry
+next
+  case (limp N G B Y M D C A)
+  case (3)
+  then show ?case sorry
+next
+  case (llol N G D1 A1 B Y M D2 C A2)
+  case (1)
+  then show ?case sorry
+next
+  case (llol N G D1 A1 B Y M D2 C A2)
+  case (2)
+  then show ?case sorry
+next
+  case (llol N G D1 A1 B Y M D2 C A2)
+  case (3)
+  then show ?case sorry  
+qed
+
   
 end
   
